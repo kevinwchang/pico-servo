@@ -33,6 +33,7 @@
 #include "fixmath.h"
 
 #include <string.h>
+#include <math.h>
 
 #define KILO 1e3
 #define MICRO 1e-6
@@ -60,24 +61,24 @@ static void wrap_cb(void)
     for (int i = 0; i < 8; ++i)
     {
         if (slice_active[i] == 0)
-	{
+        {
             continue;
         }
 
         pwm_clear_irq(i);
-        offset = 16 * ((servo_pos_buf[i + 0] + 1) % 2);
-        pwm_set_chan_level(i, 0, servo_pos[offset + i + 0]);
+        offset = 16 * !servo_pos_buf[i * 2 + 0];
+        pwm_set_chan_level(i, 0, servo_pos[offset + i * 2 + 0]);
 
-        offset = 16 * ((servo_pos_buf[i + 1] + 1) % 2);
-        pwm_set_chan_level(i, 1, servo_pos[offset + i + 1]);
+        offset = 16 * !servo_pos_buf[i * 2 + 1];
+        pwm_set_chan_level(i, 1, servo_pos[offset + i * 2 + 1]);
     }
 }
 
 /**
  * @brief Set min and max microseconds.
- * 
+ *
  * Set min and max microseconds.
- * 
+ *
  * @param a the min time in microseconds
  * @param b the max time in microseconds
  */
@@ -94,9 +95,9 @@ void servo_set_bounds(uint a, uint b)
 
 /**
  * @brief Set up the servo system.
- * 
- * Attach IRQ handler, allocate and initialize memory. * 
- * 
+ *
+ * Attach IRQ handler, allocate and initialize memory. *
+ *
  */
 int servo_init(void)
 {
@@ -115,9 +116,9 @@ int servo_init(void)
 
 /**
  * @brief Reference the primary clock.
- * 
+ *
  * Set the clock source to CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY
- * 
+ *
  */
 int servo_clock_auto(void)
 {
@@ -127,8 +128,8 @@ int servo_clock_auto(void)
 /**
  * @brief Specify the clock source.
  *
- * Specify the clock source. 
- * 
+ * Specify the clock source.
+ *
  */
 int servo_clock_source(uint src)
 {
@@ -137,7 +138,7 @@ int servo_clock_source(uint src)
     {
         return 1;
     }
-    us_per_unit = 1.f / (PWM_FREQ * WRAP) / MICRO;
+    us_per_unit = roundf(1.f / (PWM_FREQ * WRAP) / MICRO);
 
     min = min_us / us_per_unit;
     max = max_us / us_per_unit;
@@ -149,7 +150,7 @@ int servo_clock_source(uint src)
  * @brief Probably don't use this
  *
  * Not a good idea
- * 
+ *
  */
 int servo_clock_manual(uint freq)
 {
@@ -168,7 +169,7 @@ int servo_clock_manual(uint freq)
  * @brief Allocate a pin to controlling a servo
  *
  * Binds the specified pin to PWM output.
- * 
+ *
  * @param pin The pin to make PWM output.
  */
 int servo_attach(uint pin)
@@ -222,9 +223,9 @@ int servo_move_to(uint pin, uint angle)
         )
     ) + min;
 
-    uint pos = slice_map[pin] + (pin % 2);
+    uint pos = slice_map[pin] * 2 + (pin % 2);
     servo_pos[16 * servo_pos_buf[pos] + pos] = val;
-    servo_pos_buf[pos] = (servo_pos_buf[pos] + 1) % 2;
+    servo_pos_buf[pos] = !servo_pos_buf[pos];
     return 0;
 }
 
@@ -243,10 +244,10 @@ int servo_microseconds(uint pin, uint us)
     {
         return 1;
     }
-    
-    uint pos = slice_map[pin] + (pin % 2);
-    servo_pos[16 * servo_pos_buf[pos] + pos] = us;
-    servo_pos_buf[pos] = (servo_pos_buf[pos] + 1) % 2;
+
+    uint pos = slice_map[pin] * 2 + (pin % 2);
+    servo_pos[16 * servo_pos_buf[pos] + pos] = us / us_per_unit;
+    servo_pos_buf[pos] = !servo_pos_buf[pos];
     return 0;
 }
 
